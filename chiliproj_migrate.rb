@@ -70,7 +70,7 @@ end
   )
 end
 
-[WikiContent,Comment, Message].each do |m|
+[WikiContent,Comment, Message,Attachment].each do |m|
   write_to_file(
     m.all.select do |c|
       p.users.map(&:id).include?( c.author_id)
