@@ -101,21 +101,21 @@ end
 hosts.each do |host, data|
   name = "#{host} (#{data[:hostname]})"
   description = ''
-  types = []
+  labels = []
   data['types'].each do |type, data|
     data_desc = ''
-    types << "{ name: #{type}"
+    labels << current_labels[type]
     data[:data].each do |key, value|
       data_desc.concat("#{key}: #{value}\n")
     end
-    description + "#{type}\n#{'-' * type.length}\n\n#{data[:timestamp]}\n\n```\n#{data_desc}\n```\n\n"
+    description.concat("#{type}\n#{'-' * type.length}\n\n#{data[:timestamp]}\n\n```\n#{data_desc}\n```\n\n")
   end
 
   if cards.include?(name)
     card = Trello::Card.find(cards[name])
     card.name = name
     card.desc = description
-    card.card_labels = current_labels[types]
+    card.card_labels = labels
     card.closed = false
     puts 'Updating card ' + card.name
     card.save
@@ -124,7 +124,7 @@ hosts.each do |host, data|
     Trello::Card.create(
       name: name,
       list_id: reported_list.id,
-      card_labels: current_labels[types],
+      card_labels: labels,
       desc: description
     )
   end
