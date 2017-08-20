@@ -13,7 +13,7 @@ DATA_REGEX = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+\|\s+([0-9\-:\s]+)\s+\|\s+(
 # Some of the JSON is split up into multiple lines, this cleans it up
 CLEANUP_REGEX = /({[^}\n]+)\n\s([^}\n]+)\n\s([^}\n]+})/
 reports = []
-types = []
+types = {}
 hosts = {}
 reports[0] = ''
 inc = 0
@@ -31,14 +31,15 @@ end
 reports.each do |report|
   report.gsub!(CLEANUP_REGEX, '\1\2\3')
   type = report.match(/Report: (\w+)/)[1]
-  types << type
+  type_desc = report.match(/(?:Report:\s[\w-]+\n*.*?[\n\r]+)(.*?)(?>\s+IP)/m)[1]
+  types[type] = type_desc
   report.each_line do |line|
     # Skip if the data is not what we want
     next unless line.match(DATA_REGEX)
     ip = line.match(DATA_REGEX)[1]
     timestamp = line.match(DATA_REGEX)[2]
     # Remove extra newlines which show up as xD codes
-    json_data = JSON.parse(line.match(DATA_REGEX)[3].gsub(/\u000D/, ''))
+    json_data = JSON.parse(line.match(DATA_REGEX)[3].delete("\r"))
     tag = json_data['tag']
     hostname = json_data['hostname']
     # Strip data we don't need
@@ -51,9 +52,9 @@ reports.each do |report|
     # Add the record into a hash
     if hosts.include?(ip)
       hosts[ip]['types'][type] = {
-          timestamp: timestamp,
-          tag: tag,
-          data: json_data
+        timestamp: timestamp,
+        tag: tag,
+        data: json_data
       }
     else
       hosts.merge!(ip => {
@@ -75,8 +76,10 @@ end
 board = Trello::Board.find('Txq3hmlF')
 
 reported_list = nil
+type_list = nil
 board.lists.each do |list|
   reported_list = list if list.name =~ /Reported/
+  type_list = list if list.name =~ /Report Types/
 end
 
 current_labels = {}
@@ -85,17 +88,29 @@ board.labels.each do |label|
   label.delete if label.name.empty?
 end
 
-types.each do |type|
-  next if current_labels.include?(type)
-  Trello::Label.create(
+type_cards = {}
+type_list.cards.each do |card|
+  type_cards.merge!(card.name => card.id)
+end
+
+types.each do |type, _type_desc|
+  unless current_labels.include?(type)
+    Trello::Label.create(
+      name: type,
+      board_id: board.id
+    )
+  end
+  next if type_cards.include?(type)
+  Trello::Card.create(
     name: type,
-    board_id: board.id
+    list_id: type_list.id,
+    desc: types[type]
   )
 end
 
-cards = {}
+reported_cards = {}
 reported_list.cards.each do |card|
-  cards.merge!(card.name => card.id)
+  reported_cards.merge!(card.name => card.id)
 end
 
 hosts.each do |host, data|
@@ -111,8 +126,8 @@ hosts.each do |host, data|
     description.concat("#{type}\n#{'-' * type.length}\n\n#{data[:timestamp]}\n\n```\n#{data_desc}\n```\n\n")
   end
 
-  if cards.include?(name)
-    card = Trello::Card.find(cards[name])
+  if reported_cards.include?(name)
+    card = Trello::Card.find(reported_cards[name])
     card.name = name
     card.desc = description
     card.card_labels = labels
