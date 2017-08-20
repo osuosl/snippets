@@ -49,20 +49,28 @@ reports.each do |report|
     end
 
     # Add the record into a hash
-    hosts.merge!(ip => {
-                   hostname: hostname,
-                   'types' => {
-                     type => {
-                       timestamp: timestamp,
-                       tag: tag,
-                       data: json_data
+    if hosts.include?(ip)
+      hosts[ip]['types'][type] = {
+          timestamp: timestamp,
+          tag: tag,
+          data: json_data
+      }
+    else
+      hosts.merge!(ip => {
+                     hostname: hostname,
+                     'types' => {
+                       type => {
+                         timestamp: timestamp,
+                         tag: tag,
+                         data: json_data
+                       }
                      }
-                   }
-                 })
+                   })
+    end
   end
 end
-puts JSON.pretty_generate(hosts)
-exit
+# puts JSON.pretty_generate(hosts)
+# exit
 
 board = Trello::Board.find('Txq3hmlF')
 
@@ -93,14 +101,14 @@ end
 hosts.each do |host, data|
   name = "#{host} (#{data[:hostname]})"
   description = ''
-  types = ''
+  types = []
   data['types'].each do |type, data|
     data_desc = ''
-    types = type
+    types << "{ name: #{type}"
     data[:data].each do |key, value|
       data_desc.concat("#{key}: #{value}\n")
     end
-    description = "#{type}\n#{'-' * type.length}\n\n#{data[:timestamp]}\n\n```\n#{data_desc}\n```\n"
+    description + "#{type}\n#{'-' * type.length}\n\n#{data[:timestamp]}\n\n```\n#{data_desc}\n```\n\n"
   end
 
   if cards.include?(name)
@@ -108,6 +116,7 @@ hosts.each do |host, data|
     card.name = name
     card.desc = description
     card.card_labels = current_labels[types]
+    card.closed = false
     puts 'Updating card ' + card.name
     card.save
   else
