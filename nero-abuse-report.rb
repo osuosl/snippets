@@ -76,9 +76,11 @@ end
 board = Trello::Board.find('Txq3hmlF')
 
 reported_list = nil
+contacted_list = nil
 type_list = nil
 board.lists.each do |list|
   reported_list = list if list.name =~ /Reported/
+  contacted_list = list if list.name =~ /Contacted/
   type_list = list if list.name =~ /Report Types/
 end
 
@@ -113,6 +115,11 @@ reported_list.cards.each do |card|
   reported_cards.merge!(card.name => card.id)
 end
 
+contacted_cards = {}
+contacted_list.cards.each do |card|
+  contacted_cards.merge!(card.name => card.id)
+end
+
 hosts.each do |host, data|
   name = "#{host} (#{data[:hostname]})"
   description = ''
@@ -126,13 +133,21 @@ hosts.each do |host, data|
     description.concat("#{type}\n#{'-' * type.length}\n\n#{data[:timestamp]}\n\n```\n#{data_desc}\n```\n\n")
   end
 
-  if reported_cards.include?(name)
-    card = Trello::Card.find(reported_cards[name])
+  if contacted_cards.include?(name)
+    card = Trello::Card.find(contacted_cards[name])
     card.name = name
-    card.desc = description
+    card.desc = description + "\n\n" + card.desc
     card.card_labels = labels
     card.closed = false
-    puts 'Updating card ' + card.name
+    puts 'Updating Contacted card ' + card.name
+    card.save
+  elsif reported_cards.include?(name)
+    card = Trello::Card.find(reported_cards[name])
+    card.name = name
+    card.desc = description + "\n\n" + card.desc
+    card.card_labels = labels
+    card.closed = false
+    puts 'Updating Reported card ' + card.name
     card.save
   else
     puts 'Creating new card ' + name
