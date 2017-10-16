@@ -124,13 +124,13 @@ hosts.each do |host, data|
   name = "#{host} (#{data[:hostname]})"
   description = ''
   labels = []
-  data['types'].each do |type, data|
+  data['types'].each do |type, data_item|
     data_desc = ''
     labels << current_labels[type]
-    data[:data].each do |key, value|
+    data_item[:data].each do |key, value|
       data_desc.concat("#{key}: #{value}\n")
     end
-    description.concat("#{type}\n#{'-' * type.length}\n\n#{data[:timestamp]}\n\n```\n#{data_desc}\n```\n\n")
+    description.concat("#{type}\n#{'-' * type.length}\n\n#{data_item[:timestamp]}\n\n```\n#{data_desc}\n```\n\n")
   end
 
   if contacted_cards.include?(name)
